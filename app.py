@@ -1,141 +1,245 @@
-import os 
+import os
 from flask import Flask, request, jsonify
 from datetime import datetime
-import threading, random
+import threading
 
 app = Flask(__name__)
-
-GROUPS = {"global": [{"user":"KREST ADMIN","num":"000","text":"🌍 GLOBAL GROUP - Everybody join and talk! ⚡","time":"20:00","type":"text"}]}
+# Stores messages
+CHATS = {"GLOBAL GROUP": [{"user":"KREST","text":"Welcome to Global Group 🌍 Everybody talk here!","time":"20:54","me":False}]}
 PRIVATE = {}
-PROFILES = {}
-OTP = {}
 lock = threading.Lock()
 
-HTML_PAGE = """
-<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>KREST CHAT X</title>
+HTML = """
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WhatsApp</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <style>
-*{margin:0;padding:0;box-sizing:border-box;font-family:Arial}
+*{margin:0;padding:0;box-sizing:border-box;font-family: -apple-system, Arial}
 body{background:#fff;height:100vh;overflow:hidden}
-#side{width:100%;height:100vh;display:flex;flex-direction:column}
-.top{padding:14px;border-bottom:1px solid #ddd;display:flex;justify-content:space-between}
-#chatList{flex:1;overflow-y:auto;padding-bottom:90px}
-.row{display:flex;gap:12px;padding:12px;border-bottom:1px solid #f5f6f6;cursor:pointer}
-.row img{width:48px;height:48px;border-radius:50%}
-.global{background:#e7f8e8;border-left:4px solid #00a884}
-#main{position:fixed;inset:0;background:#efeae2;z-index:50;display:none;flex-direction:column}
-#main.show{display:flex}
-#mHead{padding:10px;background:#f0f2f5;display:flex;gap:10px;align-items:center}
-#msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
-.bubble{max-width:78%;padding:8px 10px;border-radius:10px;font-size:14px}
-.me{align-self:flex-end;background:#d9fdd3}
-.other{align-self:flex-start;background:#fff}
-#inputArea{padding:8px;background:#f0f2f5;display:flex;gap:8px;align-items:center}
-#inputArea input{flex:1;padding:12px;border-radius:20px;border:0;outline:0}
-#inputArea button{width:44px;height:44px;border-radius:50%;border:0;background:#00a884;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
-#micBtn{background:#111b21}
-#micBtn.rec{background:#ff3b30;animation:pulse 1s infinite}
-@keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.2)}100%{transform:scale(1)}}
-#login{position:fixed;inset:0;background:#fff;z-index:100;display:flex;align-items:center;justify-content:center;padding:16px}
-.box{padding:20px;border-radius:16px;width:100%;max-width:360px;box-shadow:0 10px 30px rgba(0,0,0,.2);text-align:center}
-.box input{width:100%;padding:12px;border-radius:8px;border:1px solid #ddd;margin:6px 0}
-.box button{width:100%;padding:12px;background:#00a884;border:0;border-radius:8px;color:#fff;font-weight:bold;margin-top:8px}
-.prev{width:90px;height:90px;border-radius:50%;border:3px solid #00a884;margin:0 auto 10px;display:block}
+#login{position:fixed;inset:0;background:#fff;z-index:1000;display:flex;align-items:center;justify-content:center}
+.card{width:90%;max-width:350px;background:#fff;border-radius:20px;box-shadow:0 10px 40px rgba(0,0,0,.15);padding:28px;text-align:center}
+.pro{width:110px;height:110px;border-radius:50%;object-fit:cover;margin:0 auto 18px;display:block;border:4px solid #0ca694}
+.btn-gray{width:100%;padding:14px;background:#f0f0f0;border:0;border-radius:12px;font-weight:600;margin-bottom:12px;cursor:pointer}
+.inp{width:100%;padding:14px;background:#eef2ff;border:0;border-radius:12px;margin-bottom:12px;font-size:15px;outline:0}
+.btn-green{width:100%;padding:15px;background:#0ca694;border:0;border-radius:12px;color:#fff;font-weight:700;font-size:16px;cursor:pointer}
+#app{display:flex;flex-direction:column;height:100vh;display:none}
+.header{background:#075E54;padding:12px 14px;color:#fff;display:flex;align-items:center;gap:10px}
+.header b{font-size:19px}
+#list{flex:1;overflow-y:auto;background:#fff}
+.chat-row{display:flex;gap:12px;padding:12px 14px;border-bottom:1px solid #f0f0f0;cursor:pointer}
+.chat-row img{width:52px;height:52px;border-radius:50%;object-fit:cover}
+.chat-row:active{background:#f5f5f5}
+#chatPage{position:fixed;inset:0;background:#ECE5DD;z-index:50;display:none;flex-direction:column}
+#chatPage.show{display:flex}
+#chatHeader{background:#f0f2f5;padding:10px 12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #ddd}
+#messages{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:6px;background-image:url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png');background-size:contain}
+.bubble{max-width:75%;padding:8px 12px;border-radius:8px;font-size:14.5px;position:relative;box-shadow:0 1px 1px rgba(0,0,0,.1)}
+.me{align-self:flex-end;background:#d9fdd3;border-top-right-radius:2px}
+.other{align-self:flex-start;background:#fff;border-top-left-radius:2px}
+.time{font-size:10px;color:#667781;float:right;margin-left:8px;margin-top:6px}
+#inputBar{padding:6px 8px;background:#f0f2f5;display:flex;align-items:center;gap:6px}
+#inputBar input{flex:1;padding:12px 16px;border-radius:24px;border:0;outline:0;font-size:15px}
+.circle{width:44px;height:44px;border-radius:50%;border:0;background:#00a884;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
+#mic.rec{background:red}
 </style></head><body>
-<div id="login"><div class="box" id="b1"><img id="prev" class="prev" src="https://i.pravatar.cc/150?u=krest"><input type="file" id="pf" accept="image/*" style="display:none"><button onclick="pf.click()" style="background:#f0f2f5;color:#000;border:1px solid #ddd">📷 Gallery</button><input id="myName" placeholder="Your Name"><input id="myNumber" placeholder="08146096232"><button onclick="sendOTP()">Continue</button><div id="e1" style="color:red;font-size:12px"></div></div><div class="box" id="b2" style="display:none"><h3>Verify</h3><p>To <b id="vNum"></b></p><div style="background:#f0f2f5;padding:10px;margin:10px 0">OTP: <b id="dOTP" style="font-size:24px;color:#00a884"></b></div><input id="otpIn" placeholder="Enter OTP"><button onclick="verifyOTP()">Verify</button><div id="e2" style="color:red;font-size:12px"></div></div></div>
-<div id="side"><div class="top"><b>KREST CHAT X</b><span style="color:#00a884;font-size:12px">● LIVE</span></div><div id="chatList"></div><div style="position:fixed;bottom:20px;right:16px;width:56px;height:56px;background:#111b21;border-radius:16px;display:flex;align-items:center;justify-content:center;color:#fff;cursor:pointer" onclick="newChat()"><i class="fa fa-plus"></i></div></div>
-<div id="main"><div id="mHead"><i class="fa fa-arrow-left" onclick="main.classList.remove('show')" style="padding:8px"></i><img id="cImg" src="https://i.pravatar.cc/100?img=12" style="width:36px;height:36px;border-radius:50%"><div><b id="cName">GLOBAL GROUP</b><br><small>Everybody can talk</small></div></div><div id="msgs"></div><div id="inputArea"><button id="micBtn" onclick="toggleMic()"><i class="fa fa-microphone"></i></button><input id="msgIn" placeholder="Message" onkeydown="if(event.key==='Enter')sendMsg()"><button onclick="sendMsg()"><i class="fa fa-paper-plane"></i></button></div></div>
+
+<div id="login">
+<div class="card">
+<img id="preview" class="pro" src="https://i.pravatar.cc/150?u=krest">
+<input type="file" id="file" accept="image/*" style="display:none">
+<button class="btn-gray" onclick="file.click()">📷 Gallery</button>
+<input id="name" class="inp" placeholder="Your name" value="KREST">
+<input id="phone" class="inp" placeholder="Phone 0911..." value="09114701914">
+<button class="btn-green" onclick="enterApp()">Continue</button>
+</div>
+</div>
+
+<div id="app">
+<div class="header"><b>WhatsApp</b><div style="margin-left:auto;display:flex;gap:18px"><i class="fa fa-search"></i><i class="fa fa-ellipsis-v"></i></div></div>
+<div style="display:flex;background:#fff;border-bottom:1px solid #eee"><div style="flex:1;text-align:center;padding:12px;border-bottom:3px solid #075E54;color:#075E54;font-weight:700">CHATS</div><div style="flex:1;text-align:center;padding:12px;color:#888">GROUPS</div><div style="flex:1;text-align:center;padding:12px;color:#888">CALLS</div></div>
+<div id="list"></div>
+<div style="position:fixed;bottom:18px;right:18px;width:56px;height:56px;background:#00a884;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;cursor:pointer" onclick="newPrivate()"><i class="fa fa-comment"></i></div>
+</div>
+
+<div id="chatPage">
+<div id="chatHeader"><i class="fa fa-arrow-left" onclick="chatPage.classList.remove('show')" style="padding:8px;cursor:pointer"></i><img id="cImg" src="https://i.pravatar.cc/100?img=12" style="width:38px;height:38px;border-radius:50%"><div><b id="cName">GLOBAL GROUP</b><br><small id="cSub" style="color:#667781">tap here for info</small></div></div>
+<div id="messages"></div>
+<div id="inputBar">
+<button class="circle" id="micBtn"><i class="fa fa-microphone"></i></button>
+<input id="msgInput" placeholder="Message">
+<button class="circle" onclick="sendMsg()" style="background:#00a884"><i class="fa fa-paper-plane"></i></button>
+</div>
+</div>
+
 <script>
-let myName="",myNumber="",pB64="",curRoom="global",isPriv=false,allChats=[],mediaRec,chunks=[],recording=false;
-pf.addEventListener('change',e=>{let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=ev=>{pB64=ev.target.result;prev.src=pB64};r.readAsDataURL(f)});
-async function sendOTP(){myName=myNameEl.value.trim();myNumber=myNumberEl.value.trim();if(!myName||myNumber.length!=11)return e1.textContent="Name + 11 digits";if(!pB64)pB64=prev.src;let res=await fetch('/api/send_otp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({number:myNumber})});let d=await res.json();vNum.textContent=myNumber;dOTP.textContent=d.otp;b1.style.display='none';b2.style.display='block';}
-async function verifyOTP(){let code=otpIn.value.trim();let res=await fetch('/api/verify_otp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({number:myNumber,otp:code,name:myName,img:pB64})});let d=await res.json();if(!d.ok)return e2.textContent=d.error;localStorage.setItem('kName',myName);localStorage.setItem('kNum',myNumber);localStorage.setItem('kImg',pB64);login.style.display='none';start();}
-const myNameEl=document.getElementById('myName'),myNumberEl=document.getElementById('myNumber'),otpIn=document.getElementById('otpIn'),login=document.getElementById('login'),main=document.getElementById('main'),prev=document.getElementById('prev'),pf=document.getElementById('pf');
-let sn=localStorage.getItem('kName'),snum=localStorage.getItem('kNum'),si=localStorage.getItem('kImg');if(sn&&snum){myName=sn;myNumber=snum;pB64=si;prev.src=pB64;login.style.display='none';start();}
-function getKey(a,b){return [a,b].sort().join('_');}
-function newChat(){let num=prompt('Enter phone 081...');if(!num||num.length!=11)return;curRoom=getKey(myNumber,num);isPriv=true;cName.textContent=num;cImg.src='https://i.pravatar.cc/100?u='+num;main.classList.add('show');load();}
-function openChat(k,priv,name,img){curRoom=k;isPriv=priv;cName.textContent=name;cImg.src=img;main.classList.add('show');load();}
-async function toggleMic(){let btn=document.getElementById('micBtn');if(!recording){try{let s=await navigator.mediaDevices.getUserMedia({audio:true});mediaRec=new MediaRecorder(s);chunks=[];mediaRec.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data)};mediaRec.onstop=async()=>{let blob=new Blob(chunks,{type:'audio/webm'});let r=new FileReader();r.onload=async()=>{await fetch(isPriv?'/api/private':'/api/groups',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:curRoom,room:curRoom,user:myName,num:myNumber,text:'Voice note',audio:r.result,type:'audio'})});load();};r.readAsDataURL(blob);};mediaRec.start();recording=true;btn.classList.add('rec');btn.innerHTML='<i class="fa fa-stop"></i>';}catch{alert('Allow mic');}}else{mediaRec.stop();recording=false;btn.classList.remove('rec');btn.innerHTML='<i class="fa fa-microphone"></i>';}}
-async function load(){let url=isPriv?'/api/private?key='+curRoom+'&me='+myNumber:'/api/groups?room='+curRoom+'&me='+myNumber;let res=await fetch(url);let data=await res.json();msgs.innerHTML='';data.messages.forEach(m=>{let d=document.createElement('div');d.className='bubble '+(m.num==myNumber?'me':'other');if(m.type=='audio'){d.innerHTML='<b style="font-size:11px">'+m.user+'</b><br><audio controls src="'+m.audio+'" style="width:180px"></audio><div style="font-size:10px;float:right">'+m.time+'</div>';}else{d.innerHTML='<b style="font-size:11px">'+m.user+'</b><br>'+m.text+'<div style="font-size:10px;float:right">'+m.time+'</div>';}msgs.appendChild(d);});msgs.scrollTop=msgs.scrollHeight;allChats=data.all_chats;render();}
-function render(){chatList.innerHTML='';let g=allChats.find(c=>c.key=='global')||{key:'global',display:'GLOBAL GROUP',last:'Everybody can join!',img:'https://i.pravatar.cc/100?img=12',time:'Live'};let row=document.createElement('div');row.className='row global';row.innerHTML='<img src="'+g.img+'"><div><b>🌍 '+g.display+'</b><div style="font-size:13px;color:#555">'+g.last+'</div></div>';row.onclick=()=>openChat('global',false,'GLOBAL GROUP','https://i.pravatar.cc/100?img=12');chatList.appendChild(row);allChats.forEach(c=>{if(c.key=='global')return;let r=document.createElement('div');r.className='row';r.innerHTML='<img src="'+c.img+'"><div><b>'+c.display+'</b><div style="font-size:13px;color:#555">'+c.last+'</div></div>';r.onclick=()=>openChat(c.key,true,c.display,c.img);chatList.appendChild(r);});}
-async function sendMsg(){let t=msgIn.value.trim();if(!t)return;msgIn.value='';await fetch(isPriv?'/api/private':'/api/groups',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:curRoom,room:curRoom,user:myName,num:myNumber,text:t,type:'text'})});load();}
-function start(){load();setInterval(load,3000);setInterval(()=>fetch('/ping'),60000);}
+let myName="", myPhone="", myImg="", current="GLOBAL GROUP", isPrivate=false, recording=false, mediaRec, chunks=[];
+const preview=document.getElementById('preview');
+document.getElementById('file').addEventListener('change', e=>{
+ let f=e.target.files[0]; if(!f) return;
+ let r=new FileReader(); r.onload=ev=>{ myImg=ev.target.result; preview.src=myImg; }; r.readAsDataURL(f);
+});
+function enterApp(){
+ myName=document.getElementById('name').value.trim()||"KREST";
+ myPhone=document.getElementById('phone').value.trim()||"09114701914";
+ if(!myImg) myImg=preview.src;
+ localStorage.setItem('wa_name',myName); localStorage.setItem('wa_phone',myPhone); localStorage.setItem('wa_img',myImg);
+ document.getElementById('login').style.display='none';
+ document.getElementById('app').style.display='flex';
+ start();
+}
+// auto login if saved
+let sn=localStorage.getItem('wa_name');
+if(sn){ myName=sn; myPhone=localStorage.getItem('wa_phone'); myImg=localStorage.getItem('wa_img'); preview.src=myImg; document.getElementById('login').style.display='none'; document.getElementById('app').style.display='flex'; start(); }
+
+function newPrivate(){
+ let p=prompt('Enter phone number to chat (e.g 081...)');
+ if(!p) return; current=p; isPrivate=true;
+ document.getElementById('cName').innerText=p; document.getElementById('cImg').src='https://i.pravatar.cc/100?u='+p;
+ document.getElementById('chatPage').classList.add('show'); loadMessages();
+}
+
+function openChat(name, img, priv){
+ current=name; isPrivate=priv;
+ document.getElementById('cName').innerText=name;
+ document.getElementById('cImg').src=img;
+ document.getElementById('chatPage').classList.add('show');
+ loadMessages();
+}
+
+async function loadMessages(){
+ let url = isPrivate? '/api/private?chat='+encodeURIComponent(current)+'&me='+myPhone : '/api/chat?chat='+encodeURIComponent(current);
+ let res = await fetch(url); let data = await res.json();
+ let box=document.getElementById('messages'); box.innerHTML='';
+ data.forEach(m=>{
+  let d=document.createElement('div'); d.className='bubble '+(m.me?'me':'other');
+  if(m.audio){ d.innerHTML=m.text+'<br><audio controls src="'+m.audio+'" style="width:160px"></audio><span class="time">'+m.time+'</span>'; }
+  else{ d.innerHTML=m.text+'<span class="time">'+m.time+'</span>'; }
+  box.appendChild(d);
+ });
+ box.scrollTop=box.scrollHeight;
+ renderList(data.all||[]);
+}
+
+function renderList(extra){
+ let list=document.getElementById('list');
+ // Keep it simple WhatsApp look
+ fetch('/api/all?me='+myPhone).then(r=>r.json()).then(all=>{
+  list.innerHTML='';
+  all.forEach(c=>{
+   let row=document.createElement('div'); row.className='chat-row';
+   row.innerHTML='<img src="'+c.img+'"><div style="flex:1"><div style="font-weight:600;display:flex;justify-content:space-between"><span>'+c.name+'</span><span style="font-size:11px;color:#667781">'+c.time+'</span></div><div style="font-size:13px;color:#667781;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+c.last+'</div></div>';
+   row.onclick=()=>openChat(c.name, c.img, c.priv);
+   list.appendChild(row);
+  });
+ });
+}
+
+async function sendMsg(){
+ let inp=document.getElementById('msgInput'); let t=inp.value.trim(); if(!t) return; inp.value='';
+ let url = isPrivate?'/api/private':'/api/chat';
+ await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat:current,user:myName,phone:myPhone,text:t})});
+ loadMessages();
+}
+document.getElementById('msgInput').addEventListener('keydown', e=>{ if(e.key==='Enter') sendMsg(); });
+
+// Mic feature 🎙
+document.getElementById('micBtn').addEventListener('click', async ()=>{
+ let btn=document.getElementById('micBtn');
+ if(!recording){
+  try{
+   let stream=await navigator.mediaDevices.getUserMedia({audio:true});
+   mediaRec=new MediaRecorder(stream); chunks=[];
+   mediaRec.ondataavailable=e=>{ if(e.data.size>0) chunks.push(e.data); };
+   mediaRec.onstop=async()=>{
+    let blob=new Blob(chunks,{type:'audio/webm'});
+    let reader=new FileReader();
+    reader.onload=async()=>{
+     let url=isPrivate?'/api/private':'/api/chat';
+     await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat:current,user:myName,phone:myPhone,text:'🎙 Voice',audio:reader.result})});
+     loadMessages();
+    };
+    reader.readAsDataURL(blob);
+   };
+   mediaRec.start(); recording=true; btn.classList.add('rec'); btn.innerHTML='<i class="fa fa-stop"></i>';
+  }catch{ alert('Allow mic'); }
+ }else{
+  mediaRec.stop(); recording=false; btn.classList.remove('rec'); btn.innerHTML='<i class="fa fa-microphone"></i>';
+ }
+});
+
+function start(){ loadMessages(); setInterval(()=>{ if(document.getElementById('chatPage').classList.contains('show')) loadMessages(); else renderList(); },2500); }
 </script></body></html>
 """
 
 @app.route('/')
 def home():
-    return HTML_PAGE
+    return HTML
 
 @app.route('/ping')
 def ping():
-    return 'alive - KREST CHAT X no sleep', 200
+    return 'ok', 200
 
-@app.route('/api/send_otp', methods=['POST'])
-def send_otp():
-    num = request.json.get('number','').strip()
-    code = str(random.randint(100000,999999))
-    with lock:
-        OTP[num] = code
-    return jsonify(ok=True, otp=code)
-
-@app.route('/api/verify_otp', methods=['POST'])
-def verify_otp():
-    d = request.json
-    num = d.get('number')
-    with lock:
-        real = OTP.get(num)
-        if not real or real!= d.get('otp'):
-            return jsonify(ok=False, error=f"Wrong code! Correct is {real}")
-        PROFILES[num] = {"name": d.get('name'), "img": d.get('img')}
-        OTP.pop(num, None)
-    return jsonify(ok=True)
-
-@app.route('/api/groups', methods=['GET','POST'])
-def groups_api():
+@app.route('/api/chat', methods=['GET','POST'])
+def chat():
     if request.method == 'GET':
+        name = request.args.get('chat','GLOBAL GROUP')
         with lock:
-            room = request.args.get('room','global')
-            msgs = GROUPS.get(room, [])
-            me = request.args.get('me','')
-            chats = [{"key":"global","display":"GLOBAL GROUP","last":msgs[-1]['text'][:40] if msgs else "Everybody join and talk!","img":"https://i.pravatar.cc/100?img=12","time":msgs[-1]['time'] if msgs else "Live"}]
-            for k,v in PRIVATE.items():
-                if me in k and v:
-                    other = k.split('_')[0] if k.split('_')[1]==me else k.split('_')[1]
-                    prof = PROFILES.get(other, {"name":other,"img":f"https://i.pravatar.cc/100?u={other}"})
-                    chats.append({"key":k,"display":prof['name'],"last":v[-1]['text'][:35],"img":prof['img'],"time":v[-1]['time']})
-            return jsonify(messages=msgs[-100:], all_chats=chats)
+            msgs = CHATS.get(name, [])
+            out=[]
+            for m in msgs[-100:]:
+                out.append({"text":m['text'],"time":m['time'],"me":False,"audio":m.get('audio')})
+            return jsonify(out)
     else:
-        d = request.json
-        room = d.get('room','global')
+        d=request.json
+        name=d.get('chat','GLOBAL GROUP')
         with lock:
-            if room not in GROUPS: GROUPS[room]=[]
-            GROUPS[room].append({"user":d['user'],"num":d['num'],"text":d['text'],"time":datetime.now().strftime("%H:%M"),"type":d.get('type','text'),"audio":d.get('audio')})
+            if name not in CHATS: CHATS[name]=[]
+            CHATS[name].append({"user":d['user'],"text":d['text'],"time":datetime.now().strftime("%H:%M"),"audio":d.get('audio')})
         return jsonify(ok=True)
 
 @app.route('/api/private', methods=['GET','POST'])
-def private_api():
+def private_chat():
     if request.method == 'GET':
+        chat = request.args.get('chat','')
+        me = request.args.get('me','')
+        key = "_".join(sorted([me, chat])) if me and chat else chat
         with lock:
-            key = request.args.get('key','')
-            me = request.args.get('me','')
             msgs = PRIVATE.get(key, [])
-            chats = [{"key":"global","display":"GLOBAL GROUP","last":GROUPS['global'][-1]['text'][:40],"img":"https://i.pravatar.cc/100?img=12","time":GROUPS['global'][-1]['time']}]
-            for k,v in PRIVATE.items():
-                if me in k and v:
-                    other = k.split('_')[0] if k.split('_')[1]==me else k.split('_')[1]
-                    prof = PROFILES.get(other, {"name":other,"img":f"https://i.pravatar.cc/100?u={other}"})
-                    chats.append({"key":k,"display":prof['name'],"last":v[-1]['text'][:35],"img":prof['img'],"time":v[-1]['time']})
-            return jsonify(messages=msgs[-100:], all_chats=chats)
+            out=[]
+            for m in msgs[-100:]:
+                out.append({"text":m['text'],"time":m['time'],"me": m.get('phone')==me, "audio":m.get('audio')})
+            return jsonify(out)
     else:
-        d = request.json
-        key = d.get('key')
+        d=request.json
+        chat=d.get('chat','')
+        me=d.get('phone','')
+        key = "_".join(sorted([me, chat]))
         with lock:
             if key not in PRIVATE: PRIVATE[key]=[]
-            PRIVATE[key].append({"user":d['user'],"num":d['num'],"text":d['text'],"time":datetime.now().strftime("%H:%M"),"type":d.get('type','text'),"audio":d.get('audio')})
+            PRIVATE[key].append({"user":d['user'],"phone":d['phone'],"text":d['text'],"time":datetime.now().strftime("%H:%M"),"audio":d.get('audio')})
         return jsonify(ok=True)
 
+@app.route('/api/all')
+def all_chats():
+    me=request.args.get('me','')
+    with lock:
+        result=[]
+        # Global always first
+        if CHATS.get("GLOBAL GROUP"):
+            last=CHATS["GLOBAL GROUP"][-1]
+            result.append({"name":"🌍 GLOBAL GROUP","last":last['text'],"time":last['time'],"img":"https://i.pravatar.cc/100?img=12","priv":False})
+        for k,v in PRIVATE.items():
+            if me in k and v:
+                other=k.replace(me,"").replace("_","")
+                if not other: continue
+                result.append({"name":other,"last":v[-1]['text'],"time":v[-1]['time'],"img":f"https://i.pravatar.cc/100?u={other}","priv":True})
+        # Also global chats
+        for k,v in CHATS.items():
+            if k!="GLOBAL GROUP" and v:
+                result.append({"name":k,"last":v[-1]['text'],"time":v[-1]['time'],"img":f"https://i.pravatar.cc/100?img={len(k)}","priv":False})
+        return jsonify(result)
+
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 10000))
+    port=int(os.environ.get('PORT',10000))
     app.run(host='0.0.0.0', port=port)
