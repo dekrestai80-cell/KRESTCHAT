@@ -1,214 +1,184 @@
 from flask import Flask, request, jsonify
 import os
-
 app = Flask(__name__)
-messages = []
-posts = []
+
+users = {}  # phone: name
+contacts = {} # phone: [ {phone, name} ]
+messages = [] # {from, to, text}
 
 @app.route('/')
 def home():
-    return """
+    return '''
 <!DOCTYPE html>
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KRESTCHAT</title>
 <style>
-body{margin:0;font-family:Arial;background:#0a0a0a;color:#fff}
-.header{background:linear-gradient(90deg,#ff00cc,#3333ff);padding:15px;text-align:center;font-size:22px;font-weight:bold}
-.box{max-width:500px;margin:auto;padding:10px;padding-bottom:80px}
-.card{background:#1a1a1a;padding:12px;border-radius:12px;margin-bottom:10px}
-input{width:100%;padding:10px;border-radius:8px;border:none;background:#2a2a2a;color:#fff;margin:5px 0}
-button{padding:10px 12px;border:none;border-radius:8px;font-weight:bold;background:linear-gradient(90deg,#ff00cc,#3333ff);color:#fff;margin-top:5px}
+body{margin:0;background:#0f0f0f;color:#fff;font-family:Arial}
+.top{background:linear-gradient(90deg,#ff00cc,#3333ff);padding:15px;text-align:center;font-weight:bold;font-size:22px}
+.box{max-width:480px;margin:auto;padding:15px}
+.card{background:#1e1e1e;padding:15px;border-radius:12px;margin-bottom:12px}
+input{width:100%;padding:12px;border:none;border-radius:8px;background:#2a2a2a;color:#fff;margin:6px 0;box-sizing:border-box}
+button{width:100%;padding:12px;border:none;border-radius:8px;background:linear-gradient(90deg,#ff00cc,#3333ff);color:#fff;font-weight:bold;margin-top:6px}
+.hide{display:none}
 .msg{background:#2a2a2a;padding:8px;border-radius:8px;margin:5px 0}
-.post-img{width:100%;border-radius:10px;margin-top:8px}
-.video-block{background:#2a2a2a;padding:30px;text-align:center;border-radius:10px}
-.switch{padding:6px 12px;background:#222;border-radius:20px;font-size:12px;cursor:pointer}
+.small{font-size:11px;color:#888}
 </style>
 </head>
 <body>
-<div class="header">KRESTCHAT - Free Mode ON</div>
+<div class="top">KRESTCHAT</div>
 <div class="box">
 
+<div id="loginBox" class="card">
+<h3>Login Required</h3>
+<p class="small">You must login before you can add people and chat</p>
+<input id="phone" placeholder="Your phone e.g +2348012345678">
+<input id="name" placeholder="Your name">
+<button onclick="doLogin()">Login / Create Account</button>
+</div>
+
+<div id="mainBox" class="hide">
 <div class="card">
-<b>Login</b><br>
-<input id="myPhone" placeholder="Your phone +234...">
-<input id="myName" placeholder="Your name">
-<button onclick="login()">Login</button>
-<span id="freeBtn" class="switch" onclick="toggleFree()">Free Mode: ON</span>
-<p id="loginStatus" style="font-size:12px;color:#aaa"></p>
+<p>Welcome <b id="myNameShow"></b> - <span id="myPhoneShow"></span> <button onclick="doLogout()" style="width:auto;padding:5px 10px;background:#ff3333">Logout</button></p>
 </div>
 
 <div class="card">
-<b>Add Number to Chat Somebody</b><br>
-<input id="otherPhone" placeholder="Other phone +234...">
-<input id="otherName" placeholder="Other name">
-<button onclick="addContact()">Add Contact</button>
-<div id="contacts"></div>
+<h3>Add People</h3>
+<p class="small">Add phone number to chat with them</p>
+<input id="addPhone" placeholder="Person phone +234...">
+<input id="addName" placeholder="Person name">
+<button onclick="addPerson()">Add Person</button>
+<div id="contactList"></div>
 </div>
 
 <div class="card">
-<b>Create Post - Photo / Video</b><br>
-<input id="postText" placeholder="What is happening?">
-<input type="file" id="postFile" accept="image/*,video/*">
-<button onclick="createPost()">Post Photo/Video</button>
-<p style="font-size:11px;color:#aaa">Photos = FREE to see. Videos = need data (like you said)</p>
+<h3 id="chatTitle">Select a person to chat</h3>
+<div id="chatArea" style="max-height:250px;overflow:auto;background:#111;padding:8px;border-radius:8px"></div>
+<input id="msgInput" placeholder="Type message...">
+<button onclick="sendChat()">Send Message</button>
 </div>
-
-<div id="feed"></div>
-
-<div class="card">
-<b id="chatTitle">Chat - select contact</b>
-<div id="chat" style="max-height:250px;overflow:auto"></div>
-<input id="msgText" placeholder="Type message...">
-<button onclick="sendMsg()">Send</button>
 </div>
 
 </div>
 <script>
-let myPhone = localStorage.getItem('phone') || '';
-let myName = localStorage.getItem('name') || '';
-let contacts = JSON.parse(localStorage.getItem('contacts') || '[]');
-let currentChat = null;
-let freeMode = localStorage.getItem('freeMode')!== 'OFF';
+let myPhone = localStorage.getItem('krest_phone');
+let myName = localStorage.getItem('krest_name');
+let myContacts = JSON.parse(localStorage.getItem('krest_contacts')||'[]');
+let chatWith = null;
 
-document.getElementById('myPhone').value = myPhone;
-document.getElementById('myName').value = myName;
-updateFreeBtn();
-
-function updateFreeBtn(){
-  document.getElementById('freeBtn').innerText = freeMode? 'Free Mode: ON (Chat+Photos FREE)' : 'Free Mode: OFF';
+function checkLogin(){
+  if(myPhone && myName){
+    document.getElementById('loginBox').className='card hide';
+    document.getElementById('mainBox').className='';
+    document.getElementById('myNameShow').innerText=myName;
+    document.getElementById('myPhoneShow').innerText=myPhone;
+    renderContacts();
+  } else {
+    document.getElementById('loginBox').className='card';
+    document.getElementById('mainBox').className='hide';
+  }
 }
 
-function toggleFree(){
-  freeMode =!freeMode;
-  localStorage.setItem('freeMode', freeMode? 'ON' : 'OFF');
-  updateFreeBtn();
-  loadFeed();
+function doLogin(){
+  let p=document.getElementById('phone').value;
+  let n=document.getElementById('name').value;
+  if(!p || !n){alert('Enter phone and name');return;}
+  fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:p,name:n})})
+  .then(r=>r.json()).then(d=>{
+    myPhone=p; myName=n;
+    localStorage.setItem('krest_phone',p);
+    localStorage.setItem('krest_name',n);
+    checkLogin();
+  });
 }
 
-function login(){
-  myPhone = document.getElementById('myPhone').value;
-  myName = document.getElementById('myName').value;
-  if(!myPhone ||!myName){alert('Enter phone and name'); return;}
-  localStorage.setItem('phone', myPhone);
-  localStorage.setItem('name', myName);
-  document.getElementById('loginStatus').innerText = 'Logged in as ' + myName;
-  renderContacts();
+function doLogout(){
+  localStorage.clear();
+  myPhone=null; myName=null; chatWith=null;
+  location.reload();
 }
 
-function addContact(){
-  let p = document.getElementById('otherPhone').value;
-  let n = document.getElementById('otherName').value;
-  if(!p){alert('Enter phone'); return;}
-  if(!n) n = p;
-  contacts.push({phone:p, name:n});
-  localStorage.setItem('contacts', JSON.stringify(contacts));
-  document.getElementById('otherPhone').value = '';
-  document.getElementById('otherName').value = '';
+function addPerson(){
+  if(!myPhone){alert('Login first!');return;}
+  let p=document.getElementById('addPhone').value;
+  let n=document.getElementById('addName').value;
+  if(!p){alert('Enter phone');return;}
+  if(!n) n=p;
+  myContacts.push({phone:p,name:n});
+  localStorage.setItem('krest_contacts',JSON.stringify(myContacts));
+  document.getElementById('addPhone').value='';
+  document.getElementById('addName').value='';
   renderContacts();
 }
 
 function renderContacts(){
-  let div = document.getElementById('contacts');
-  div.innerHTML = '';
-  contacts.forEach(function(c){
-    div.innerHTML += '<div class=msg onclick="openChat(&quot;'+c.phone+'&quot;)"><b>'+c.name+'</b> - '+c.phone+'</div>';
+  let div=document.getElementById('contactList');
+  div.innerHTML='';
+  myContacts.forEach(c=>{
+    div.innerHTML += '<div class=msg onclick="openChat(\\''+c.phone+'\\')"><b>'+c.name+'</b> - '+c.phone+' (tap to chat)</div>';
   });
 }
 
 function openChat(phone){
-  currentChat = phone;
-  document.getElementById('chatTitle').innerText = 'Chatting with ' + phone;
-  loadMessages();
+  if(!myPhone){alert('Login first!');return;}
+  chatWith=phone;
+  document.getElementById('chatTitle').innerText='Chatting with '+phone;
+  loadChat();
 }
 
-function loadMessages(){
-  fetch('/api/get').then(r=>r.json()).then(function(res){
-    let chatDiv = document.getElementById('chat');
-    chatDiv.innerHTML = '';
-    res.messages.forEach(function(m){
-      if((m.from==myPhone && m.to==currentChat) || (m.from==currentChat && m.to==myPhone)){
-        let who = m.from==myPhone? 'You' : m.name;
-        chatDiv.innerHTML += '<div class=msg><b>'+who+':</b> '+m.text+'</div>';
+function loadChat(){
+  if(!chatWith) return;
+  fetch('/api/get').then(r=>r.json()).then(data=>{
+    let area=document.getElementById('chatArea');
+    area.innerHTML='';
+    data.forEach(m=>{
+      if((m.from==myPhone && m.to==chatWith) || (m.from==chatWith && m.to==myPhone)){
+        let who = m.from==myPhone ? 'You' : m.from;
+        area.innerHTML += '<div class=msg><b>'+who+':</b> '+m.text+'</div>';
       }
     });
   });
 }
 
-function sendMsg(){
-  let t = document.getElementById('msgText').value;
-  if(!t ||!currentChat){alert('Select contact first'); return;}
-  fetch('/api/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from:myPhone,to:currentChat,name:myName,text:t})}).then(function(){document.getElementById('msgText').value=''; loadMessages();});
-}
-
-function createPost(){
-  let txt = document.getElementById('postText').value;
-  let fileInput = document.getElementById('postFile');
-  let file = fileInput.files[0];
-  if(!txt &&!file){alert('Type something or add photo/video'); return;}
-
-  if(file){
-    let reader = new FileReader();
-    reader.onload = function(e){
-      let type = file.type.includes('video')? 'video' : 'image';
-      sendPost(txt, e.target.result, type);
-    };
-    reader.readAsDataURL(file);
-  } else {
-    sendPost(txt, '', 'text');
-  }
-}
-
-function sendPost(text, data, type){
-  fetch('/api/post',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:myName, phone:myPhone, text:text, media:data, mtype:type})}).then(function(){document.getElementById('postText').value=''; document.getElementById('postFile').value=''; loadFeed();});
-}
-
-function loadFeed(){
-  fetch('/api/get').then(r=>r.json()).then(function(res){
-    let feed = document.getElementById('feed');
-    feed.innerHTML = '';
-    res.posts.slice().reverse().forEach(function(p){
-      let html = '<div class=card><b>'+p.name+'</b> - '+p.phone+'<p>'+p.text+'</p>';
-      if(p.mtype=='image' && p.media){
-        html += '<img src="'+p.media+'" class="post-img">';
-      } else if(p.mtype=='video' && p.media){
-        if(freeMode){
-          html += '<div class=video-block>VIDEO - Free mode hides video to save data<br><button onclick="this.parentElement.innerHTML=\\'<video src='+p.media+' controls style=width:100%><\\\\/video>\\'">Use Data to Watch Video</button></div>';
-        } else {
-          html += '<video src="'+p.media+'" controls style="width:100%;border-radius:10px"></video>';
-        }
-      }
-      html += '</div>';
-      feed.innerHTML += html;
-    });
+function sendChat(){
+  if(!myPhone){alert('You must login first!');return;}
+  if(!chatWith){alert('Select a person to chat first');return;}
+  let t=document.getElementById('msgInput').value;
+  if(!t) return;
+  fetch('/api/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from:myPhone,to:chatWith,text:t})})
+  .then(r=>r.json()).then(d=>{
+    document.getElementById('msgInput').value='';
+    loadChat();
   });
 }
 
-renderContacts();
-loadFeed();
-setInterval(function(){if(currentChat) loadMessages();},2000);
-setInterval(loadFeed,5000);
+checkLogin();
+setInterval(()=>{if(chatWith) loadChat();},2000);
 </script>
 </body>
 </html>
-"""
+'''
+
+@app.route('/api/login', methods=['POST'])
+def login():
+    d=request.get_json()
+    users[d['phone']] = d['name']
+    if d['phone'] not in contacts:
+        contacts[d['phone']] = []
+    return jsonify({'ok':True})
 
 @app.route('/api/get')
-def get_data():
-    return jsonify({'messages': messages[-200:], 'posts': posts[-100:]})
+def get_msg():
+    return jsonify(messages[-200:])
 
 @app.route('/api/send', methods=['POST'])
-def send_msg():
-    d = request.get_json()
-    messages.append({'from': d.get('from',''), 'to': d.get('to',''), 'name': d.get('name','Guest'), 'text': d.get('text','')})
-    return jsonify({'ok': True})
-
-@app.route('/api/post', methods=['POST'])
-def create_post():
-    d = request.get_json()
-    posts.append({'name': d.get('name','Guest'), 'phone': d.get('phone',''), 'text': d.get('text',''), 'media': d.get('media',''), 'mtype': d.get('mtype','text')})
-    return jsonify({'ok': True})
+def send():
+    d=request.get_json()
+    if not d.get('from') or not d.get('to'):
+        return jsonify({'error':'login required'}), 400
+    messages.append({'from':d['from'],'to':d['to'],'text':d.get('text','')})
+    return jsonify({'ok':True})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT',10000)))
