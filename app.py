@@ -202,3 +202,15 @@ def all_chats():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port)
+<div style="background:#075E54; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center;">
+  <b>KRESTCHAT</b>
+  <button id="logoutBtn" style="background:red; color:white; border:none; padding:5px 10px; border-radius:4px;">Log Out</button>
+</div>
+
+<script>
+document.getElementById('logoutBtn').onclick = function() {
+  localStorage.clear();
+  sessionStorage.clear();
+  window.location.href = '/';
+};
+</script>
