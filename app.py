@@ -8,7 +8,7 @@ posts = []
 def home():
     return '''
 <!DOCTYPE html>
-<html>
+< HTML>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KRESTCHAT</title>
