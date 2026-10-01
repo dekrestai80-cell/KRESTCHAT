@@ -1,6 +1,5 @@
 from flask import Flask, request, jsonify
-import os, random
-app = Flask(__name__)
+import os, random app = Flask(__name__)
 users = {}
 msgs = []
 posts = []
