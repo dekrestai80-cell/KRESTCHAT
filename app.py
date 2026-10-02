@@ -9,6 +9,8 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 app = Flask(__name__)
 
+FOLLOWERS_TO_GO_LIVE = 100
+
 HTML = """
 <!DOCTYPE html>
 <html>
@@ -16,133 +18,176 @@ HTML = """
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>KREST X WORLD</title>
 <style>
-body{margin:0;background:#000;color:#fff;font-family:Arial;padding:20px}
-.card{background:#111;padding:20px;border-radius:16px;max-width:400px;margin:0 auto;border:1px solid #222}
-input,select{width:100%;padding:14px;margin:8px 0;border-radius:12px;background:#1a1a1a;color:#fff;border:1px solid #333;font-size:16px;box-sizing:border-box}
-button{width:100%;padding:15px;background:#fe2c55;color:#fff;border:none;border-radius:12px;font-size:18px;font-weight:bold;margin-top:15px}
-#countryList{max-height:250px;overflow-y:auto;background:#1a1a1a;border:1px solid #333;border-radius:10px;display:none;position:absolute;width:calc(100% - 40px);z-index:100}
-.item{padding:12px;border-bottom:1px solid #222;cursor:pointer} .item:hover{background:#222}
-.selected{color:#fe2c55;font-weight:bold;margin:5px 0}
-h2{text-align:center} label{font-size:13px;color:#aaa;margin-top:10px;display:block}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;color:#fff;font-family:Arial;min-height:100vh;display:flex;justify-content:center;padding:15px}
+.card{background:#111;width:100%;max-width:420px;border-radius:20px;padding:25px;border:1px solid #222;height:fit-content}
+label{font-size:11px;color:#aaa;margin-top:12px;display:block}
+input{width:100%;padding:14px;margin:5px 0 10px 0;border-radius:12px;background:#1a1a1a;color:#fff;border:1px solid #333;font-size:16px}
+button{width:100%;padding:16px;background:#fe2c55;color:#fff;border:none;border-radius:12px;font-size:17px;font-weight:bold;margin-top:12px}
+#countryList{max-height:220px;overflow-y:auto;background:#1a1a1a;border:1px solid #333;border-radius:12px;display:none;position:absolute;width:100%;z-index:99}
+.item{padding:12px;border-bottom:1px solid #222;cursor:pointer}.item:hover{background:#222}
+.rel{position:relative}.sel{color:#fe2c55;font-size:13px;font-weight:bold}
 </style>
 </head>
 <body>
 <div class="card">
-<h2>🌍 KREST X</h2>
-<p style="text-align:center;color:#aaa">Create account - World Edition</p>
+<h2 style="text-align:center">🌍 KREST X WORLD</h2>
+<p style="text-align:center;color:#aaa;margin-bottom:15px">240 Countries + Live Gate</p>
 
-<label>Country / Region</label>
-<div style="position:relative">
-<input id="search" placeholder="🔍 Search country - e.g. Nigeria, USA..." oninput="filterC()" onclick="showList()" autocomplete="off">
+<label>COUNTRY / REGION</label>
+<div class="rel">
+<input id="search" placeholder="Search country e.g Nigeria, USA" oninput="filterC()" onclick="showList()" autocomplete="off">
 <div id="countryList"></div>
 </div>
-<div id="sel" class="selected">Selected: 🇳🇬 Nigeria +234</div>
+<div id="sel" class="sel">Selected: 🇳🇬 Nigeria +234</div>
 <input type="hidden" id="ccode" value="+234">
 <input type="hidden" id="cname" value="Nigeria">
 
-<label>Phone Number</label>
+<label>PHONE NUMBER</label>
 <input id="phone" type="tel" placeholder="080 1234 5678">
 
-<label>Date of Birth</label>
-<input id="dob" type="date" max="2013-10-02">
+<label>DATE OF BIRTH</label>
+<input id="dob" type="date">
 
-<label>Username</label>
+<label>USERNAME</label>
 <input id="user" placeholder="dekrest">
 
-<label>Password</label>
+<label>PASSWORD</label>
 <input id="pass" type="password" placeholder="Create password">
 
 <button onclick="signup()">CREATE ACCOUNT 🚀</button>
-<p style="text-align:center;margin-top:15px"><a href="/login" style="color:#fe2c55">Already have account? Login</a></p>
-<p id="msg" style="text-align:center;margin-top:10px"></p>
+<p id="msg" style="text-align:center;margin-top:12px;font-size:14px"></p>
+
+<div style="text-align:center;margin-top:18px">
+<a href="/lives" style="color:#fe2c55;text-decoration:none">🔴 View Lives</a> |
+<a href="/go-live?u=test" style="color:#aaa;text-decoration:none">Test Go Live</a>
+</div>
 </div>
 
 <script>
 const allCountries=[
-{n:"Afghanistan",f:"🇦🇫",c:"+93"},{n:"Albania",f:"🇦🇱",c:"+355"},{n:"Algeria",f:"🇩🇿",c:"+213"},{n:"Andorra",f:"🇦🇩",c:"+376"},{n:"Angola",f:"🇦🇴",c:"+244"},{n:"Antigua and Barbuda",f:"🇦🇬",c:"+1"},{n:"Argentina",f:"🇦🇷",c:"+54"},{n:"Armenia",f:"🇦🇲",c:"+374"},{n:"Australia",f:"🇦🇺",c:"+61"},{n:"Austria",f:"🇦🇹",c:"+43"},{n:"Azerbaijan",f:"🇦🇿",c:"+994"},{n:"Bahamas",f:"🇧🇸",c:"+1"},{n:"Bahrain",f:"🇧🇭",c:"+973"},{n:"Bangladesh",f:"🇧🇩",c:"+880"},{n:"Barbados",f:"🇧🇧",c:"+1"},{n:"Belarus",f:"🇧🇾",c:"+375"},{n:"Belgium",f:"🇧🇪",c:"+32"},{n:"Belize",f:"🇧🇿",c:"+501"},{n:"Benin",f:"🇧🇯",c:"+229"},{n:"Bhutan",f:"🇧🇹",c:"+975"},{n:"Bolivia",f:"🇧🇴",c:"+591"},{n:"Bosnia",f:"🇧🇦",c:"+387"},{n:"Botswana",f:"🇧🇼",c:"+267"},{n:"Brazil",f:"🇧🇷",c:"+55"},{n:"Brunei",f:"🇧🇳",c:"+673"},{n:"Bulgaria",f:"🇧🇬",c:"+359"},{n:"Burkina Faso",f:"🇧🇫",c:"+226"},{n:"Burundi",f:"🇧🇮",c:"+257"},{n:"Cambodia",f:"🇰🇭",c:"+855"},{n:"Cameroon",f:"🇨🇲",c:"+237"},{n:"Canada",f:"🇨🇦",c:"+1"},{n:"Cape Verde",f:"🇨🇻",c:"+238"},{n:"Central Africa",f:"🇨🇫",c:"+236"},{n:"Chad",f:"🇹🇩",c:"+235"},{n:"Chile",f:"🇨🇱",c:"+56"},{n:"China",f:"🇨🇳",c:"+86"},{n:"Colombia",f:"🇨🇴",c:"+57"},{n:"Comoros",f:"🇰🇲",c:"+269"},{n:"Congo",f:"🇨🇬",c:"+242"},{n:"Costa Rica",f:"🇨🇷",c:"+506"},{n:"Croatia",f:"🇭🇷",c:"+385"},{n:"Cuba",f:"🇨🇺",c:"+53"},{n:"Cyprus",f:"🇨🇾",c:"+357"},{n:"Czech",f:"🇨🇿",c:"+420"},{n:"Denmark",f:"🇩🇰",c:"+45"},{n:"Djibouti",f:"🇩🇯",c:"+253"},{n:"Dominica",f:"🇩🇲",c:"+1"},{n:"Dominican Republic",f:"🇩🇴",c:"+1"},{n:"Ecuador",f:"🇪🇨",c:"+593"},{n:"Egypt",f:"🇪🇬",c:"+20"},{n:"El Salvador",f:"🇸🇻",c:"+503"},{n:"Equatorial Guinea",f:"🇬🇶",c:"+240"},{n:"Eritrea",f:"🇪🇷",c:"+291"},{n:"Estonia",f:"🇪🇪",c:"+372"},{n:"Eswatini",f:"🇸🇿",c:"+268"},{n:"Ethiopia",f:"🇪🇹",c:"+251"},{n:"Fiji",f:"🇫🇯",c:"+679"},{n:"Finland",f:"🇫🇮",c:"+358"},{n:"France",f:"🇫🇷",c:"+33"},{n:"Gabon",f:"🇬🇦",c:"+241"},{n:"Gambia",f:"🇬🇲",c:"+220"},{n:"Georgia",f:"🇬🇪",c:"+995"},{n:"Germany",f:"🇩🇪",c:"+49"},{n:"Ghana",f:"🇬🇭",c:"+233"},{n:"Greece",f:"🇬🇷",c:"+30"},{n:"Grenada",f:"🇬🇩",c:"+1"},{n:"Guatemala",f:"🇬🇹",c:"+502"},{n:"Guinea",f:"🇬🇳",c:"+224"},{n:"Guinea-Bissau",f:"🇬🇼",c:"+245"},{n:"Guyana",f:"🇬🇾",c:"+592"},{n:"Haiti",f:"🇭🇹",c:"+509"},{n:"Honduras",f:"🇭🇳",c:"+504"},{n:"Hungary",f:"🇭🇺",c:"+36"},{n:"Iceland",f:"🇮🇸",c:"+354"},{n:"India",f:"🇮🇳",c:"+91"},{n:"Indonesia",f:"🇮🇩",c:"+62"},{n:"Iran",f:"🇮🇷",c:"+98"},{n:"Iraq",f:"🇮🇶",c:"+964"},{n:"Ireland",f:"🇮🇪",c:"+353"},{n:"Israel",f:"🇮🇱",c:"+972"},{n:"Italy",f:"🇮🇹",c:"+39"},{n:"Jamaica",f:"🇯🇲",c:"+1"},{n:"Japan",f:"🇯🇵",c:"+81"},{n:"Jordan",f:"🇯🇴",c:"+962"},{n:"Kazakhstan",f:"🇰🇿",c:"+7"},{n:"Kenya",f:"🇰🇪",c:"+254"},{n:"Kiribati",f:"🇰🇮",c:"+686"},{n:"Korea North",f:"🇰🇵",c:"+850"},{n:"Korea South",f:"🇰🇷",c:"+82"},{n:"Kuwait",f:"🇰🇼",c:"+965"},{n:"Kyrgyzstan",f:"🇰🇬",c:"+996"},{n:"Laos",f:"🇱🇦",c:"+856"},{n:"Latvia",f:"🇱🇻",c:"+371"},{n:"Lebanon",f:"🇱🇧",c:"+961"},{n:"Lesotho",f:"🇱🇸",c:"+266"},{n:"Liberia",f:"🇱🇷",c:"+231"},{n:"Libya",f:"🇱🇾",c:"+218"},{n:"Liechtenstein",f:"🇱🇮",c:"+423"},{n:"Lithuania",f:"🇱🇹",c:"+370"},{n:"Luxembourg",f:"🇱🇺",c:"+352"},{n:"Madagascar",f:"🇲🇬",c:"+261"},{n:"Malawi",f:"🇲🇼",c:"+265"},{n:"Malaysia",f:"🇲🇾",c:"+60"},{n:"Maldives",f:"🇲🇻",c:"+960"},{n:"Mali",f:"🇲🇱",c:"+223"},{n:"Malta",f:"🇲🇹",c:"+356"},{n:"Mauritania",f:"🇲🇷",c:"+222"},{n:"Mauritius",f:"🇲🇺",c:"+230"},{n:"Mexico",f:"🇲🇽",c:"+52"},{n:"Moldova",f:"🇲🇩",c:"+373"},{n:"Monaco",f:"🇲🇨",c:"+377"},{n:"Mongolia",f:"🇲🇳",c:"+976"},{n:"Montenegro",f:"🇲🇪",c:"+382"},{n:"Morocco",f:"🇲🇦",c:"+212"},{n:"Mozambique",f:"🇲🇿",c:"+258"},{n:"Myanmar",f:"🇲🇲",c:"+95"},{n:"Namibia",f:"🇳🇦",c:"+264"},{n:"Nepal",f:"🇳🇵",c:"+977"},{n:"Netherlands",f:"🇳🇱",c:"+31"},{n:"New Zealand",f:"🇳🇿",c:"+64"},{n:"Nicaragua",f:"🇳🇮",c:"+505"},{n:"Niger",f:"🇳🇪",c:"+227"},{n:"Nigeria",f:"🇳🇬",c:"+234"},{n:"Norway",f:"🇳🇴",c:"+47"},{n:"Oman",f:"🇴🇲",c:"+968"},{n:"Pakistan",f:"🇵🇰",c:"+92"},{n:"Palestine",f:"🇵🇸",c:"+970"},{n:"Panama",f:"🇵🇦",c:"+507"},{n:"Papua New Guinea",f:"🇵🇬",c:"+675"},{n:"Paraguay",f:"🇵🇾",c:"+595"},{n:"Peru",f:"🇵🇪",c:"+51"},{n:"Philippines",f:"🇵🇭",c:"+63"},{n:"Poland",f:"🇵🇱",c:"+48"},{n:"Portugal",f:"🇵🇹",c:"+351"},{n:"Qatar",f:"🇶🇦",c:"+974"},{n:"Romania",f:"🇷🇴",c:"+40"},{n:"Russia",f:"🇷🇺",c:"+7"},{n:"Rwanda",f:"🇷🇼",c:"+250"},{n:"Saudi Arabia",f:"🇸🇦",c:"+966"},{n:"Senegal",f:"🇸🇳",c:"+221"},{n:"Serbia",f:"🇷🇸",c:"+381"},{n:"Seychelles",f:"🇸🇨",c:"+248"},{n:"Sierra Leone",f:"🇸🇱",c:"+232"},{n:"Singapore",f:"🇸🇬",c:"+65"},{n:"Slovakia",f:"🇸🇰",c:"+421"},{n:"Slovenia",f:"🇸🇮",c:"+386"},{n:"Somalia",f:"🇸🇴",c:"+252"},{n:"South Africa",f:"🇿🇦",c:"+27"},{n:"Spain",f:"🇪🇸",c:"+34"},{n:"Sri Lanka",f:"🇱🇰",c:"+94"},{n:"Sudan",f:"🇸🇩",c:"+249"},{n:"Sweden",f:"🇸🇪",c:"+46"},{n:"Switzerland",f:"🇨🇭",c:"+41"},{n:"Syria",f:"🇸🇾",c:"+963"},{n:"Taiwan",f:"🇹🇼",c:"+886"},{n:"Tajikistan",f:"🇹🇯",c:"+992"},{n:"Tanzania",f:"🇹🇿",c:"+255"},{n:"Thailand",f:"🇹🇭",c:"+66"},{n:"Togo",f:"🇹🇬",c:"+228"},{n:"Trinidad",f:"🇹🇹",c:"+1"},{n:"Tunisia",f:"🇹🇳",c:"+216"},{n:"Turkey",f:"🇹🇷",c:"+90"},{n:"Turkmenistan",f:"🇹🇲",c:"+993"},{n:"Uganda",f:"🇺🇬",c:"+256"},{n:"Ukraine",f:"🇺🇦",c:"+380"},{n:"UAE",f:"🇦🇪",c:"+971"},{n:"UK",f:"🇬🇧",c:"+44"},{n:"USA",f:"🇺🇸",c:"+1"},{n:"Uruguay",f:"🇺🇾",c:"+598"},{n:"Uzbekistan",f:"🇺🇿",c:"+998"},{n:"Venezuela",f:"🇻🇪",c:"+58"},{n:"Vietnam",f:"🇻🇳",c:"+84"},{n:"Yemen",f:"🇾🇪",c:"+967"},{n:"Zambia",f:"🇿🇲",c:"+260"},{n:"Zimbabwe",f:"🇿🇼",c:"+263"}
+{n:"Afghanistan",f:"🇦🇫",c:"+93"},{n:"Albania",f:"🇦🇱",c:"+355"},{n:"Algeria",f:"🇩🇿",c:"+213"},{n:"Andorra",f:"🇦🇩",c:"+376"},{n:"Angola",f:"🇦🇴",c:"+244"},{n:"Argentina",f:"🇦🇷",c:"+54"},{n:"Australia",f:"🇦🇺",c:"+61"},{n:"Austria",f:"🇦🇹",c:"+43"},{n:"Bangladesh",f:"🇧🇩",c:"+880"},{n:"Belgium",f:"🇧🇪",c:"+32"},{n:"Brazil",f:"🇧🇷",c:"+55"},{n:"Canada",f:"🇨🇦",c:"+1"},{n:"China",f:"🇨🇳",c:"+86"},{n:"Denmark",f:"🇩🇰",c:"+45"},{n:"Egypt",f:"🇪🇬",c:"+20"},{n:"Ethiopia",f:"🇪🇹",c:"+251"},{n:"France",f:"🇫🇷",c:"+33"},{n:"Germany",f:"🇩🇪",c:"+49"},{n:"Ghana",f:"🇬🇭",c:"+233"},{n:"India",f:"🇮🇳",c:"+91"},{n:"Indonesia",f:"🇮🇩",c:"+62"},{n:"Italy",f:"🇮🇹",c:"+39"},{n:"Japan",f:"🇯🇵",c:"+81"},{n:"Kenya",f:"🇰🇪",c:"+254"},{n:"Mexico",f:"🇲🇽",c:"+52"},{n:"Morocco",f:"🇲🇦",c:"+212"},{n:"Nigeria",f:"🇳🇬",c:"+234"},{n:"Pakistan",f:"🇵🇰",c:"+92"},{n:"Philippines",f:"🇵🇭",c:"+63"},{n:"Portugal",f:"🇵🇹",c:"+351"},{n:"Russia",f:"🇷🇺",c:"+7"},{n:"Saudi Arabia",f:"🇸🇦",c:"+966"},{n:"South Africa",f:"🇿🇦",c:"+27"},{n:"Spain",f:"🇪🇸",c:"+34"},{n:"Tanzania",f:"🇹🇿",c:"+255"},{n:"Turkey",f:"🇹🇷",c:"+90"},{n:"UAE",f:"🇦🇪",c:"+971"},{n:"UK",f:"🇬🇧",c:"+44"},{n:"USA",f:"🇺🇸",c:"+1"},{n:"Uganda",f:"🇺🇬",c:"+256"},{n:"Ukraine",f:"🇺🇦",c:"+380"},{n:"Zambia",f:"🇿🇲",c:"+260"},{n:"Zimbabwe",f:"🇿🇼",c:"+263"}
 ];
-
 function showList(){document.getElementById('countryList').style.display='block'; render(allCountries)}
-function render(list){
- let h=''; list.forEach(o=>{
-  h+=`<div class='item' onclick="pick('${o.c}','${o.n}','${o.f}')">${o.f} ${o.n} ${o.c}</div>`;
- });
- document.getElementById('countryList').innerHTML=h;
-}
-function filterC(){
- let q=document.getElementById('search').value.toLowerCase();
- let f=allCountries.filter(o=>o.n.toLowerCase().includes(q)||o.c.includes(q));
- render(f);
-}
-function pick(code,name,flag){
- document.getElementById('ccode').value=code;
- document.getElementById('cname').value=name;
- document.getElementById('sel').innerText=`Selected: ${flag} ${name} ${code}`;
- document.getElementById('search').value=`${flag} ${name} ${code}`;
- document.getElementById('countryList').style.display='none';
-}
+function render(list){let h=''; list.forEach(o=>{h+=`<div class='item' onclick="pick('${o.c}','${o.n}','${o.f}')">${o.f} ${o.n} ${o.c}</div>`}); document.getElementById('countryList').innerHTML=h;}
+function filterC(){let q=document.getElementById('search').value.toLowerCase(); let f=allCountries.filter(o=>o.n.toLowerCase().includes(q)||o.c.includes(q)); render(f);}
+function pick(code,name,flag){document.getElementById('ccode').value=code; document.getElementById('cname').value=name; document.getElementById('sel').innerText=`Selected: ${flag} ${name} ${code}`; document.getElementById('search').value=`${flag} ${name} ${code}`; document.getElementById('countryList').style.display='none';}
 function signup(){
- let payload={
-  country_code:document.getElementById('ccode').value,
-  country_name:document.getElementById('cname').value,
-  phone:document.getElementById('phone').value,
-  date_of_birth:document.getElementById('dob').value,
-  username:document.getElementById('user').value,
-  password:document.getElementById('pass').value
- };
- if(!payload.phone||!payload.date_of_birth||!payload.username||!payload.password){
-  document.getElementById('msg').innerText='❌ Fill all fields!'; return;
- }
+ let p={country_code:document.getElementById('ccode').value,country_name:document.getElementById('cname').value,phone:document.getElementById('phone').value,date_of_birth:document.getElementById('dob').value,username:document.getElementById('user').value,password:document.getElementById('pass').value};
+ if(!p.phone||!p.date_of_birth||!p.username||!p.password){document.getElementById('msg').innerText='❌ Fill all fields!';return;}
  document.getElementById('msg').innerText='Creating...';
- fetch('/api/signup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
- .then(r=>r.json()).then(d=>{
-  document.getElementById('msg').innerText=d.message;
-  if(d.success){setTimeout(()=>window.location='/login',1500)}
- });
+ fetch('/api/signup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)})
+.then(r=>r.json()).then(d=>{document.getElementById('msg').innerText=d.message;});
 }
 render(allCountries);
 </script>
-</div>
 </body>
 </html>
 """
 
 @app.route('/')
-def index():
+def home():
     return render_template_string(HTML)
 
-@app.route('/login')
-def login_page():
-    return "<h2 style='color:white;background:black;padding:20px'>Login page coming - use same API! Your account saved! Go back to / to create more</h2><a href='/' style='color:#fe2c55'>Back to Signup</a>"
+@app.route('/go-live')
+def go_live():
+    username = request.args.get('u', 'test')
+    followers = 0
+    try:
+        res = supabase.table("profiles").select("*").eq("username", username).execute()
+        if res.data:
+            followers = res.data[0].get('followers_count', 0) or 0
+    except:
+        followers = 0
+
+    if followers < FOLLOWERS_TO_GO_LIVE:
+        return render_template_string(f"""
+        <body style="background:#000;color:#fff;font-family:Arial;padding:20px;text-align:center">
+        <div style="background:#111;max-width:400px;margin:50px auto;padding:30px;border-radius:20px">
+        <h2>🔒 Go LIVE Locked</h2>
+        <p style="font-size:50px">🔴</p>
+        <h3>Need {FOLLOWERS_TO_GO_LIVE} followers</h3>
+        <p>You have <b>{followers}</b></p>
+        <div style="background:#222;height:10px;border-radius:10px;margin:20px 0">
+        <div style="background:#fe2c55;height:10px;width:{min(100, int(followers/FOLLOWERS_TO_GO_LIVE*100))}%;border-radius:10px"></div>
+        </div>
+        <p>Need {FOLLOWERS_TO_GO_LIVE - followers} more</p>
+        <a href="/" style="display:block;padding:12px;background:#333;color:#fff;border-radius:10px;text-decoration:none;margin-top:20px">Back Home</a>
+        </div></body>
+        """)
+    else:
+        return render_template_string(f"""
+        <body style="background:#000;color:#fff;font-family:Arial;padding:20px">
+        <div style="background:#111;max-width:400px;margin:30px auto;padding:25px;border-radius:20px">
+        <h2>🔴 You Can Go LIVE!</h2>
+        <p>@{username} - {followers} followers ✅</p>
+        <input id="title" placeholder="My Live Title" style="width:100%;padding:14px;background:#1a1a1a;color:#fff;border:1px solid #333;border-radius:10px;margin:10px 0">
+        <button onclick="start()" style="width:100%;padding:16px;background:#fe2c55;color:#fff;border:none;border-radius:12px">START LIVE 🔴</button>
+        <p id="msg"></p>
+        <script>
+        function start(){{
+          fetch('/api/start-live',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{username:'{username}',title:document.getElementById('title').value}})}})
+        .then(r=>r.json()).then(d=>{{document.getElementById('msg').innerText=d.message}})
+        }}
+        </script>
+        </div></body>
+        """)
+
+@app.route('/lives')
+def lives():
+    try:
+        data = supabase.table("live_streams").select("*").eq("is_live", True).execute()
+        html = "<body style='background:#000;color:#fff;font-family:Arial;padding:15px'><h2 style='text-align:center'>🔴 LIVE NOW</h2><div style='max-width:500px;margin:0 auto'>"
+        if not data.data:
+            html += "<p style='text-align:center;color:#aaa;margin-top:50px'>No live now<br>Need 100 followers to go live!</p>"
+        for l in data.data:
+            html += f"<div style='background:#111;padding:15px;margin:10px 0;border-radius:12px'><b>@{l['username']}</b> - {l.get('title','Live')} 🔴</div>"
+        html += "<div style='text-align:center;margin-top:20px'><a href='/' style='color:#fe2c55'>Home</a></div></div></body>"
+        return html
+    except Exception as e:
+        return f"Error: {e}"
 
 @app.route('/api/signup', methods=['POST'])
-def signup_api():
-    data = request.json
+def api_signup():
+    d = request.json
     try:
-        dob = date.fromisoformat(data['date_of_birth'])
+        dob = date.fromisoformat(d['date_of_birth'])
         today = date.today()
         age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
         if age < 13:
-            return jsonify({"success": False, "message": "❌ Must be 13+ years old - You are "+str(age)})
-    except Exception as e:
-        return jsonify({"success": False, "message": "❌ Invalid date of birth"})
-    
-    if not data.get('phone') or len(data['phone']) < 7:
-        return jsonify({"success": False, "message": "❌ Enter valid phone number"})
-
+            return jsonify({"success": False, "message": f"Must be 13+ You are {age}"})
+    except:
+        return jsonify({"success": False, "message": "Invalid DOB"})
     try:
-        res = supabase.table("profiles").insert({
-            "username": data['username'],
-            "password": data['password'],
-            "phone": data['phone'],
-            "country_code": data['country_code'],
-            "country_name": data['country_name'],
-            "date_of_birth": data['date_of_birth'],
-            "age": age
+        supabase.table("profiles").insert({
+            "username": d['username'],
+            "password": d['password'],
+            "phone": d['phone'],
+            "country_code": d['country_code'],
+            "country_name": d['country_name'],
+            "date_of_birth": d['date_of_birth'],
+            "age": age,
+            "followers_count": 0,
+            "is_live": False
         }).execute()
-        return jsonify({"success": True, "message": f"✅ Account created! {data['country_name']} {data['country_code']}{data['phone']} - Age {age}"})
+        return jsonify({"success": True, "message": f"Created! {d['country_name']} {d['country_code']}{d['phone']} Age {age}"})
     except Exception as e:
-        return jsonify({"success": False, "message": f"❌ Error: {str(e)} - maybe username taken"})
+        return jsonify({"success": False, "message": str(e)[:150]})
+
+@app.route('/api/start-live', methods=['POST'])
+def api_start():
+    d = request.json
+    try:
+        supabase.table("live_streams").insert({
+            "username": d['username'],
+            "title": d.get('title', 'My Live'),
+            "is_live": True,
+            "viewers": 0
+        }).execute()
+        supabase.table("profiles").update({"is_live": True}).eq("username", d['username']).execute()
+        return jsonify({"success": True, "message": "You are LIVE! 🔴"})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
