@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, render_template_string
 from supabase import create_client
-from datetime import dates 
+from datetime import date
 import os
 
 SUPABASE_URL = "https://vbbfhsafshqjjnkogsro.supabase.co"
